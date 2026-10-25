@@ -1,0 +1,13 @@
+services:
+  circleci-runner:
+    build: .
+    image: platform-circleci-runner
+    container_name: platform-circleci-runner
+    env_file: runner.env
+    environment:
+      CIRCLECI_RUNNER_NAME: platform-runner-local
+    volumes:
+      # Pulumi local state of this machine, shared with the pipeline.
+      # In the CircleCI context: PULUMI_BACKEND_URL=file:///state
+      - ${USERPROFILE}/.pulumi:/state/.pulumi
+    restart: unless-stopped

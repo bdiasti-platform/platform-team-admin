@@ -1,0 +1,6 @@
+*.pyc
+venv/
+.venv/
+.env
+secrets-setup/*.json
+runner/runner.env

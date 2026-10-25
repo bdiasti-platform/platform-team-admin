@@ -1,0 +1,99 @@
+version: 2.1
+
+orbs:
+  pulumi: pulumi/pulumi@2.1.0
+  python: circleci/python@3.1.0
+
+# Secrets come from the CircleCI context PLATFORM_ADMIN
+globals:
+  - &context PLATFORM_ADMIN
+
+# Filters reused by the workflows (YAML anchors): which events trigger which job
+on-push-main: &on-push-main
+  branches:
+    only: /main/
+  tags:
+    ignore: /.*/
+
+on-tag-main: &on-tag-main
+  branches:
+    ignore: /.*/
+  tags:
+    only: /.*/
+
+# Jobs run on the self-hosted (local) runner. The resource class must exist in
+# CircleCI: Organization Settings -> Self-Hosted Runners.
+executors:
+  local-runner:
+    machine: true
+    resource_class: bdiasti-platform/platform-runner
+
+commands:
+  setup-pulumi:
+    description: Install uv and Pulumi, then log in to the state backend
+    steps:
+      - checkout
+      - run:
+          name: Install uv
+          command: |
+            command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_ENV"
+      - run:
+          name: Install Pulumi CLI
+          command: |
+            command -v pulumi >/dev/null || curl -fsSL https://get.pulumi.com | sh
+            echo 'export PATH="$HOME/.pulumi/bin:$PATH"' >> "$BASH_ENV"
+      - run:
+          name: Log in to the Pulumi backend
+          # PULUMI_BACKEND_URL comes from the context (file://~ local, or s3://...)
+          command: pulumi login "$PULUMI_BACKEND_URL"
+
+jobs:
+  pulumi-preview:
+    parameters:
+      pulumi_stack:
+        type: string
+    executor: local-runner
+    steps:
+      - setup-pulumi
+      - run:
+          name: Pulumi preview (<< parameters.pulumi_stack >>)
+          command: pulumi preview --stack << parameters.pulumi_stack >> --non-interactive --diff
+
+  pulumi-update:
+    parameters:
+      pulumi_stack:
+        type: string
+    executor: local-runner
+    steps:
+      - setup-pulumi
+      - run:
+          name: Pulumi update (<< parameters.pulumi_stack >>)
+          command: pulumi up --stack << parameters.pulumi_stack >> --non-interactive --yes
+
+workflows:
+  # Push to main: only shows what would change
+  preview:
+    jobs:
+      - pulumi-preview:
+          context: *context
+          pulumi_stack: dev
+          filters: *on-push-main
+  # Tag: preview -> manual approval -> apply
+  update:
+    jobs:
+      - pulumi-preview:
+          context: *context
+          pulumi_stack: dev
+          filters: *on-tag-main
+      - approvegithubchanges:
+          type: approval
+          requires:
+            - pulumi-preview
+          filters: *on-tag-main
+      - pulumi-update:
+          context: *context
+          pulumi_stack: dev
+          requires:
+            - approvegithubchanges
+          filters: *on-tag-main

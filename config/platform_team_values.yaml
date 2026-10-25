@@ -1,0 +1,22 @@
+github_organization_members:
+  - name: Team Member
+    github-role: member
+    github-username: bdiastiplatformenginner
+    email: bdias.ti+member-team@gmail.com
+
+# public: on GitHub Free, branch protection only works on public repositories
+github_repositories:
+  - name: platform-team-admin
+    description: Repository to manage platform team membership and admin
+                 artifacts
+    visibility: public
+  - name: platform-core
+    description: Core platform runtime
+    visibility: public
+  - name: platform-demo-apps
+    description: Demo application for testing the platform
+    visibility: public
+  # Exercise: protected repository
+  - name: platform-extensions
+    description: Extensions and add-ons built on top of the platform
+    visibility: public
